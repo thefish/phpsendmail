@@ -123,8 +123,6 @@ class SendMail
         $this->prepareAttachments();
         $this->prepareHeaders();
 
-        print_r($this);
-
         if (!empty($this->smtpDsn)) {
             $this->sendOverSocket();
         } else {
@@ -219,10 +217,7 @@ class SendMail
         $errstr = "";
         $c = parse_url($this->smtpDsn);
 
-        print_r($c['scheme'].'://'.$c['host']);
         $socket = fsockopen($c['scheme'].'://'.$c['host'], $c['port'], $errno, $errstr, 30);
-
-        print_r($c);
 
         try {
             if (!$socket) {
@@ -283,17 +278,14 @@ class SendMail
         while (substr($response, 3, 1) !== ' ' && ($i > 0)) {
             $response = fgets($socket, 256);
             $i--;
-            echo "<<<\n".$response."\n\n";
             if (empty($response)) {
                 throw new SendMailException("could not get smtp server response from socket for ".$title);
-                // trigger_error("could not get smtp server response from socket for ".$title);
             }
         }
 
         $code = substr($response, 0, 3);
         if ($code !== $expected) {
             if (!$skip) {
-                // trigger_error('unexpected response from socket, expected '
                 throw new SendMailException('unexpected response from socket, expected '
                         .$expected.', got '.$code.' for '.$title);
             }
