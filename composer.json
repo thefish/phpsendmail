@@ -1,0 +1,15 @@
+{
+    "name": "thefish/phpsendmail",
+    "autoload": {
+        "psr-4": {
+            "Spliff\\Utils\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "thefish",
+            "email": "thefish@zaar.be"
+        }
+    ],
+    "require": {}
+}
