@@ -1,7 +1,6 @@
 {
     "name": "thefish/phpsendmail",
     "description": "Small (one-file, to be exact) library for sending emails via SMTP server (or sendmail utility). Allows you to handle multiple recipients and attachments.",
-    "version": "0.0.2-beta",
     "type": "library",
     "autoload": {
         "psr-4": {
@@ -19,5 +18,6 @@
         "email":"thefish@zaar.be",
         "telegram":"https://t.me/justthefish"
     },
+    "license": "MIT",
     "require": {}
 }
