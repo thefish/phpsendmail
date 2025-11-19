@@ -10,31 +10,29 @@ class SendMail
 
     public int $maxAttachmentSize;
 
-    private string $encoding;
     public string $charset;
 
     protected string $from = '';
-    protected string $fromName = '';
-    protected string $replyTo = '';
+    protected string $fromName = ''; //@todo allow to post names
 
     private array $recipients = [];
 
     public array $headers;
     public string $subject;
     public string $body;
-    public string $altBody;
+    public string $altBody; //@todo use altBody for html email
 
     public string $smtpDsn = '';
     private string $cmdlineSendmailParams = '';
     protected bool $isHtml = false;
 
-    private array $filesToAttach;
+    private array $filesToAttach = [];
 
-    public static function newInstance(): ?SendMail
+    public static function newInstance(): SendMail
     {
         $sm = new SendMail();
         $sm->maxAttachmentSize = 10485760; //10 MB
-        $sm->charset = 'UTF-8';
+        $sm->charset = 'UTF-8'; //default charset, others must handle htmlentities
         return $sm;
     }
 
@@ -66,7 +64,7 @@ class SendMail
 
     public function setReplyTo(string $email): SendMail
     {
-        $this->replyTo = $email;
+        $this->addHeader('Reply-To', $email);
         return $this;
     }
 
@@ -144,6 +142,12 @@ class SendMail
 
     private function prepareHeaders()
     {
+        if (empty($this->from)) {
+            throw new SendMailException("from field can not be empty");
+        }
+        if (empty($this->recipients)) {
+            throw new SendMailException("no recipients were set");
+        }
 
         $this->defaults([
             'Content-Type' => ''.$this->bodyContentType().'; charset="'.$this->charset.'"',
@@ -193,7 +197,7 @@ class SendMail
             $content = chunk_split(base64_encode($content));
 
             $newBody .= self::CRLF."--".$mimeBoundary.self::CRLF;
-            $newBody .= 'Content-Type: '.$mimeType.'; name="'.basename($file).'"'.self::CRLF; // use different content types here
+            $newBody .= 'Content-Type: '.$mimeType.'; name="'.basename($file).'"'.self::CRLF;
             $newBody .= 'Content-Transfer-Encoding: base64'.self::CRLF;
             $newBody .= 'Content-Disposition: attachment; filename="'.basename($file).'"'.self::CRLF;
             $newBody .= self::CRLF.$content.self::CRLF.self::CRLF; //pre double crlf
@@ -225,42 +229,42 @@ class SendMail
                     .(empty($c['scheme']) ? '' : $c['scheme'].'://').$c['host'].':'.$c['port']
                     .' ('.$errno.') '.$errstr);
             }
-            $this->testSocketResponse($socket, 'Connect', '220');
+            $this->rcv($socket, 'Connect', '220');
             fputs($socket, 'EHLO '.$c['host'].self::CRLF);
 
             try {
-                $this->testSocketResponse($socket, 'EHLO', '250', true);
+                $this->rcv($socket, 'EHLO', '250', true);
             } catch (Exception $e) {
                 fputs($socket, 'HELO '.$c['host'].self::CRLF);
-                $this->testSocketResponse($socket, 'HELO', '250');
+                $this->rcv($socket, 'HELO', '250');
             }
 
             if (!empty($c['user'])) {
 
                 fputs($socket, 'AUTH LOGIN'.self::CRLF);
-                $this->testSocketResponse($socket, 'AUTH', '334');
+                $this->rcv($socket, 'AUTH', '334');
 
                 fputs($socket, base64_encode($c['user']).self::CRLF);
-                $this->testSocketResponse($socket, 'User', '334');
+                $this->rcv($socket, 'User', '334');
 
                 fputs($socket, base64_encode($c['pass']).self::CRLF);
-                $this->testSocketResponse($socket, 'Password', '235');
+                $this->rcv($socket, 'Password', '235');
             }
 
             fputs($socket, 'MAIL FROM: <'. $this->from .'>'.self::CRLF);
-            $this->testSocketResponse($socket, 'MAIL', '250');
+            $this->rcv($socket, 'MAIL', '250');
 
             foreach ($this->recipients as $to) {
                 fputs($socket, 'RCPT TO: <'.$to.'>'.self::CRLF);
-                $this->testSocketResponse($socket, 'RCPT', '250');
+                $this->rcv($socket, 'RCPT', '250');
             }
 
             fputs($socket, 'DATA'.self::CRLF);
-            $this->testSocketResponse($socket, 'DATA', '354');
+            $this->rcv($socket, 'DATA', '354');
 
             fputs($socket, $this->body.self::CRLF.'.'.self::CRLF); //note dot
 
-            $this->testSocketResponse($socket, 'End data', '250');
+            $this->rcv($socket, 'End data', '250');
 
         } catch (Exception $e) {
             throw $e;
@@ -271,7 +275,7 @@ class SendMail
 
     }
 
-    private function testSocketResponse($socket, $title, $expected, $skip = false)
+    private function rcv($socket, $title, $expected, $skip = false)
     {
         $i = 100;
         $response = '';

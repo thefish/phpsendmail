@@ -30,12 +30,10 @@ $to      = 'your.mailbox@someserver.com';
 $subject = '['. DOMAIN_NAME .'] Site form inquiry';
 $message = $_REQUEST['name']. ' ['.$_REQUEST['email'].'] made an inquiry:'."\r\n==\r\n".$_REQUEST['text'];
 
-## SendMail::setFrom('thefish@zaar.be');
-
 $smtp = SendMail::newInstance();
 $smtp->setSmtpDsn('ssl://username:password@smtp.someserver.com:465')
     ->setFrom('robot@yoursite.com')
-    ->addHeader('Reply-To', $_REQUEST['email'])
+    ->setReplyTo($_REQUEST['email'])
     ->addHeader('Message-ID', uniqid().'@'. DOMAIN_NAME)
     ->addHeader('X-Mailer', 'thefish/phpsendmail@'.phpversion())
     ->setSubject($subject)
