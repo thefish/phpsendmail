@@ -153,10 +153,11 @@ class SendMail
             'Content-Type' => ''.$this->bodyContentType().'; charset="'.$this->charset.'"',
             'From' => $this->from,
             'Subject' => $this->subject,
-            'Reply-To' => ($this->replyTo ? $this->replyTo : $this->from),
+            'Reply-To' => $this->from,
         ]);
 
         //glue result in front of body
+        $this->body = self::CRLF.$this->body;
         foreach ($this->headers as $k => $v) {
             $this->body = $k.': '.$v.self::CRLF.$this->body;
         }
