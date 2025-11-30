@@ -13,106 +13,124 @@ class SendMail
     public string $charset;
 
     protected string $from = '';
-    protected string $fromName = ''; //@todo allow to post names
+
+    protected string $fromName = ''; // @todo allow to post names
 
     private array $recipients = [];
 
     public array $headers;
+
     public string $subject;
+
     public string $body;
-    public string $altBody; //@todo use altBody for html email
+
+    public string $altBody; // @todo use altBody for html email
 
     public string $smtpDsn = '';
+
     private string $cmdlineSendmailParams = '';
+
     protected bool $isHtml = false;
 
     private array $filesToAttach = [];
 
     public static function newInstance(): SendMail
     {
-        $sm = new SendMail();
-        $sm->maxAttachmentSize = 10485760; //10 MB
-        $sm->charset = 'UTF-8'; //default charset, others must handle htmlentities
+        $sm = new SendMail;
+        $sm->maxAttachmentSize = 10485760; // 10 MB
+        $sm->charset = 'UTF-8'; // default charset, others must handle htmlentities
+
         return $sm;
     }
 
     public function setSmtpDsn(string $dsn): SendMail
     {
         $this->smtpDsn = $dsn;
+
         return $this;
     }
-
 
     public function setFrom(string $email, string $name = ''): SendMail
     {
         if (empty($email)) {
-            throw new SendMailException("From email cannot be empty");
+            throw new SendMailException('From email cannot be empty');
         }
         $this->from = $email;
 
-        if (!empty($name)) {
+        if (! empty($name)) {
             $this->fromName = $name;
         }
+
         return $this;
     }
 
     public function setSubject(string $subj): SendMail
     {
         $this->subject = $subj;
+
         return $this;
     }
 
     public function setReplyTo(string $email): SendMail
     {
         $this->addHeader('Reply-To', $email);
+
         return $this;
     }
 
     public function addRecipient(string $email): SendMail
     {
         array_push($this->recipients, $email);
+
         return $this;
     }
 
     public function clearRecipients(): SendMail
     {
         $this->recipients = [];
+
         return $this;
     }
 
     public function addHeader(string $key, string $value): SendMail
     {
         $this->headers[$key] = $value;
+
         return $this;
     }
 
     public function setBody(string $body): SendMail
     {
         $this->body = $body;
+
         return $this;
     }
 
     public function setCmdlineSendmailParams(string $params): SendMail
     {
         $this->cmdlineSendmailParams = $params;
+
         return $this;
     }
 
     public function setHtml(): SendMail
     {
         $this->isHtml = true;
+
         return $this;
     }
 
     public function setPlain(): SendMail
     {
         $this->isHtml = false;
+
         return $this;
     }
 
     public function addAttachment(string $fname): SendMail
     {
         $this->filesToAttach[] = $fname;
+
         return $this;
     }
 
@@ -121,32 +139,35 @@ class SendMail
         $this->prepareAttachments();
         $this->prepareHeaders();
 
-        if (!empty($this->smtpDsn)) {
+        if (! empty($this->smtpDsn)) {
             $this->sendOverSocket();
         } else {
-            //fallback sendmail
+            // fallback sendmail
             mail(array_shift($this->recipients), $this->subject, $this->body, [], $this->cmdlineSendmailParams);
         }
 
         return $this;
     }
 
-    private function defaults(array $d)
+    /**
+     * @param  array<string,string>  $d
+     */
+    private function defaults(array $d): void
     {
         foreach ($d as $key => $value) {
-            if (!isset($this->headers[$key])) {
+            if (! isset($this->headers[$key])) {
                 $this->headers[$key] = $value;
             }
         }
     }
 
-    private function prepareHeaders()
+    private function prepareHeaders(): void
     {
         if (empty($this->from)) {
-            throw new SendMailException("from field can not be empty");
+            throw new SendMailException('from field can not be empty');
         }
         if (empty($this->recipients)) {
-            throw new SendMailException("no recipients were set");
+            throw new SendMailException('no recipients were set');
         }
 
         $this->defaults([
@@ -156,22 +177,21 @@ class SendMail
             'Reply-To' => $this->from,
         ]);
 
-        //glue result in front of body
+        // glue result in front of body
         $this->body = self::CRLF.$this->body;
         foreach ($this->headers as $k => $v) {
             $this->body = $k.': '.$v.self::CRLF.$this->body;
         }
     }
 
-    private function prepareAttachments()
+    private function prepareAttachments(): void
     {
         if (empty($this->filesToAttach)) {
             return;
         }
         $mimeBoundary = md5(date('r', time()));
         $this->headers['Content-Type'] = 'multipart/mixed; boundary="'.$mimeBoundary.'"';
-        $this->headers['MIME-Version'] = '1.0'; //?
-
+        $this->headers['MIME-Version'] = '1.0'; // ?
 
         $newBody = implode(self::CRLF, [
             '',
@@ -180,7 +200,7 @@ class SendMail
             '--'.$mimeBoundary,
             'Content-Type: '.$this->bodyContentType().'; charset="'.$this->charset.'"',
             'Content-Transfer-Encoding: 8bit',
-        ]).self::CRLF.self::CRLF.$this->body.self::CRLF.self::CRLF; //note double crlf at end
+        ]).self::CRLF.self::CRLF.$this->body.self::CRLF.self::CRLF; // note double crlf at end
 
         foreach ($this->filesToAttach as $file) {
 
@@ -190,19 +210,19 @@ class SendMail
                 $mimeType = 'application/octet-stream';
             }
             if ($fileSize > $this->maxAttachmentSize) {
-                throw new SendMailException("file ".$file." is too big to attach");
+                throw new SendMailException('file '.$file.' is too big to attach');
             }
-            $handle = fopen($file, "r");
+            $handle = fopen($file, 'r');
             $content = fread($handle, $fileSize);
             fclose($handle);
             $content = chunk_split(base64_encode($content));
 
-            $newBody .= self::CRLF."--".$mimeBoundary.self::CRLF;
+            $newBody .= self::CRLF.'--'.$mimeBoundary.self::CRLF;
             $newBody .= 'Content-Type: '.$mimeType.'; name="'.basename($file).'"'.self::CRLF;
             $newBody .= 'Content-Transfer-Encoding: base64'.self::CRLF;
             $newBody .= 'Content-Disposition: attachment; filename="'.basename($file).'"'.self::CRLF;
-            $newBody .= self::CRLF.$content.self::CRLF.self::CRLF; //pre double crlf
-            $newBody .= self::CRLF."--".$mimeBoundary.self::CRLF;
+            $newBody .= self::CRLF.$content.self::CRLF.self::CRLF; // pre double crlf
+            $newBody .= self::CRLF.'--'.$mimeBoundary.self::CRLF;
         }
 
         $this->altBody = $this->body;
@@ -212,71 +232,70 @@ class SendMail
 
     private function bodyContentType(): string
     {
-        return "text/".($this->isHtml ? "html" : "plain");
+        return 'text/'.($this->isHtml ? 'html' : 'plain');
     }
 
-
-    private function sendOverSocket()
+    private function sendOverSocket(): void
     {
         $errno = 0;
-        $errstr = "";
+        $errstr = '';
         $c = parse_url($this->smtpDsn);
 
         $socket = fsockopen($c['scheme'].'://'.$c['host'], $c['port'], $errno, $errstr, 30);
 
         try {
-            if (!$socket) {
+            if (! $socket) {
                 throw new SendMailException('could not connect to smtp host '
                     .(empty($c['scheme']) ? '' : $c['scheme'].'://').$c['host'].':'.$c['port']
                     .' ('.$errno.') '.$errstr);
             }
             $this->rcv($socket, 'Connect', '220');
-            fputs($socket, 'EHLO '.$c['host'].self::CRLF);
+            fwrite($socket, 'EHLO '.$c['host'].self::CRLF);
 
             try {
                 $this->rcv($socket, 'EHLO', '250', true);
             } catch (Exception $e) {
-                fputs($socket, 'HELO '.$c['host'].self::CRLF);
+                fwrite($socket, 'HELO '.$c['host'].self::CRLF);
                 $this->rcv($socket, 'HELO', '250');
             }
 
-            if (!empty($c['user'])) {
+            if (! empty($c['user'])) {
 
-                fputs($socket, 'AUTH LOGIN'.self::CRLF);
+                fwrite($socket, 'AUTH LOGIN'.self::CRLF);
                 $this->rcv($socket, 'AUTH', '334');
 
-                fputs($socket, base64_encode($c['user']).self::CRLF);
+                fwrite($socket, base64_encode($c['user']).self::CRLF);
                 $this->rcv($socket, 'User', '334');
 
-                fputs($socket, base64_encode($c['pass']).self::CRLF);
+                fwrite($socket, base64_encode($c['pass']).self::CRLF);
                 $this->rcv($socket, 'Password', '235');
             }
 
-            fputs($socket, 'MAIL FROM: <'. $this->from .'>'.self::CRLF);
+            fwrite($socket, 'MAIL FROM: <'.$this->from.'>'.self::CRLF);
             $this->rcv($socket, 'MAIL', '250');
 
             foreach ($this->recipients as $to) {
-                fputs($socket, 'RCPT TO: <'.$to.'>'.self::CRLF);
+                fwrite($socket, 'RCPT TO: <'.$to.'>'.self::CRLF);
                 $this->rcv($socket, 'RCPT', '250');
             }
 
-            fputs($socket, 'DATA'.self::CRLF);
+            fwrite($socket, 'DATA'.self::CRLF);
             $this->rcv($socket, 'DATA', '354');
 
-            fputs($socket, $this->body.self::CRLF.'.'.self::CRLF); //note dot
+            fwrite($socket, $this->body.self::CRLF.'.'.self::CRLF); // note dot
 
             $this->rcv($socket, 'End data', '250');
 
         } catch (Exception $e) {
             throw $e;
         } finally {
-            fputs($socket, 'QUIT'.self::CRLF);
+            fwrite($socket, 'QUIT'.self::CRLF);
             fclose($socket);
         }
 
     }
 
-    private function rcv($socket, $title, $expected, $skip = false)
+    private function rcv(\Socket $socket, string $title, string $expected, bool $skip = false): void
     {
         $i = 100;
         $response = '';
@@ -284,21 +303,18 @@ class SendMail
             $response = fgets($socket, 256);
             $i--;
             if (empty($response)) {
-                throw new SendMailException("could not get smtp server response from socket for ".$title);
+                throw new SendMailException('could not get smtp server response from socket for '.$title);
             }
         }
 
         $code = substr($response, 0, 3);
         if ($code !== $expected) {
-            if (!$skip) {
+            if (! $skip) {
                 throw new SendMailException('unexpected response from socket, expected '
                         .$expected.', got '.$code.' for '.$title);
             }
         }
     }
-
 }
 
-class SendMailException extends Exception
-{
-}
+class SendMailException extends Exception {}
